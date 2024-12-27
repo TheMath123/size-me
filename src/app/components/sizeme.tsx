@@ -1,45 +1,71 @@
-'use client'
+import React, { useRef, useState, useEffect } from 'react';
 
-import React from 'react';
-
+/**
+ * Represents the dimensions of an element
+ */
 interface Dimensions {
   width: number;
   height: number;
 }
 
-interface SizeMeProps extends React.ComponentPropsWithoutRef<"div"> {
+// Omit children from div props since we'll define our own children type
+type DivProps = Omit<React.ComponentPropsWithoutRef<"div">, "children">;
+
+/**
+ * Props for the SizeMe component
+ * Extends div props but with a custom children render prop
+ */
+interface SizeMeProps extends DivProps {
   children: (dimensions: Dimensions) => React.ReactNode;
 }
 
+/**
+ * A component that measures its own dimensions and provides them to its children
+ * through a render prop pattern.
+ * 
+ * **Note:** SizeMe will not collect the size of the component if it has a minimum or maximum value explicitly set.
+ * 
+ * @example
+ * ```tsx
+ * <SizeMe>
+ *   {({ width, height }) => (
+ *     <div>
+ *       Width: {width}px, Height: {height}px
+ *     </div>
+ *   )}
+ * </SizeMe>
+ * ```
+ */
 const SizeMe = React.forwardRef<HTMLDivElement, SizeMeProps>(
-  ({ children, ...props }, forwardedRef) => {
-    const [dimensions, setDimensions] = React.useState<Dimensions>({ width: 0, height: 0 });
-    const elementRef = React.useRef<HTMLDivElement>(null);
+  ({ children, style, ...props }, forwardedRef) => {
+    const [dimensions, setDimensions] = useState<Dimensions>({ width: 0, height: 0 });
+    const elementRef = useRef<HTMLDivElement>(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
       const element = elementRef.current;
       if (!element) return;
 
+      // Function to update dimensions using getBoundingClientRect
       const updateDimensions = () => {
         const { width, height } = element.getBoundingClientRect();
-
-        console.log('width', width);
         setDimensions({ width, height });
       };
 
-      // Observador de redimensionamento
+      // Create a ResizeObserver to watch for size changes
       const resizeObserver = new ResizeObserver(updateDimensions);
       resizeObserver.observe(element);
 
       // Medição inicial
       updateDimensions();
 
+      // Cleanup: disconnect the observer when component unmounts
       return () => {
         resizeObserver.disconnect();
       };
     }, []);
 
-    // Mescla as refs
+
+    // Merge the forwarded ref with our internal ref
     const mergedRef = (node: HTMLDivElement) => {
       elementRef.current = node;
       if (typeof forwardedRef === 'function') {
@@ -50,7 +76,14 @@ const SizeMe = React.forwardRef<HTMLDivElement, SizeMeProps>(
     };
 
     return (
-      <div ref={mergedRef} {...props}>
+      <div
+        ref={mergedRef}
+        style={{
+          display: 'inline-block', // Ensure the div wraps its content
+          ...style
+        }}
+        {...props}
+      >
         {children(dimensions)}
       </div>
     );
